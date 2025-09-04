@@ -1,0 +1,6 @@
+.clangd
+bin
+tmp
+build
+compile_commands.json
+iso_root
