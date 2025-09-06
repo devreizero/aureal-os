@@ -1,0 +1,4 @@
+# Files that are shared with x86 architecture
+
+arch/i386/arch_main.c
+arch/i386/serial.c

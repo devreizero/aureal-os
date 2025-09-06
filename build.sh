@@ -17,6 +17,11 @@ outputFile="${outputFile:="aureal"}"
 outputFileFormat="${protocol}-${arch}_${outputFile}"
 outputPath="$buildDir/$outputFileFormat"
 
+declare -a objFiles
+declare -a tmpFiles
+declare -a taskPids
+declare -a cFiles
+
 # ===================================================================================================================
 # Verifying entrypoint
 
@@ -201,17 +206,35 @@ fi
 LDFLAGS="-m $archTarget -nostdlib -static -z $KERNEL_LDFLAGS --gc-sections -T $linkerScript"
 
 # ===================================================================================================================
+# Parse shared.txt if it exist, much better than `#include "path/to/file.c` to share code.
+
+if [ -f "$entry/arch/$arch/shared.txt" ]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        lineTrimmed="$(echo "$line" | sed 's/\r$//' | xargs)"
+        file="$lineTrimmed"
+
+        if [[ -z "$lineTrimmed" || "$lineTrimmed" == "" || "$lineTrimmed" =~ ^"#" ]]
+            then continue; fi
+
+        if [ ! -e "$entry/$file" ]; then
+            echo "Error: File '$file' listed in $entry/arch/$arch/shared.txt doesn't exist"
+            exit 1
+        elif [ ! -f "$entry/$file" ]; then
+            echo "Error: File '$file' listed in $entry/arch/$arch/shared.txt is not a file"
+            exit 1
+        fi
+
+        cFiles+=("$entry/$file")
+    done < "$entry/arch/$arch/shared.txt"
+fi
+
+# ===================================================================================================================
 # Actually no, the compilation starts just now.
 
 export binDir
 export tmpDir
 export CC
 export CFLAGS
-
-declare -a objFiles
-declare -a tmpFiles
-declare -a taskPids
-declare -a cFiles
 
 compileC () {
     local file="$1"
@@ -248,10 +271,8 @@ processFiles () {
             wait -n
         fi
     done < <(
-        find "$entry" \
-        -type f -name "*.c" \
-        "${findRules[@]}" \
-        -print0
+        find "$entry" -type f -name "*.c" "${findRules[@]}" -print0
+        printf '%s\0' "${cFiles[@]}"
     )
 }
 
@@ -288,6 +309,34 @@ createCompileCommands () {
 
 createCompileCommands
 
+# ===================================================================================================================
+# Adding assembly support
+
+# while IFS= read -r -d '' file; do
+#     fileOut="$binDir/$file.o"
+#     objFiles+=("$binDir/$file.o")
+
+#     # Skip if object is newer than source
+#     if [[ -f "$fileOut" && "$fileOut" -nt "$file" ]]; then
+#         continue
+#     fi
+
+#     $AS $ASFLAGS
+#         tmpFiles+=("$tmpDir/$file.json")
+#         taskPids+=($!)
+#         compiledFilesCount=$((compiledFilesCount + 1))
+
+#         # If we hit the job cap, wait for *any* to finish
+#         if [ "$(jobs -rp | wc -l)" -ge "$maxJobs" ]; then
+#             wait -n
+#         fi
+#     done < <(
+#         find "$entry" \
+#         -type f -name "*.c" \
+#         "${findRules[@]}" \
+#         -print0
+#     )
+
 link () {
     if [ "$compiledFilesCount" == "0" ] && [ -f "$outputPath.raw" ]; then
         echo "[LINKING] Skipping linking, files are up to date."
@@ -323,9 +372,9 @@ buildLimine () {
     
     echo "[BIOS INSTALL] Building Limine ISO"
     $LIMINE bios-install "$outputPath.iso"
-
-    echo "TO TEST:"
-    echo "qemu-system-$archClangTarget -cdrom $outputPath.iso"
 }
 
 if [ "$protocol" == "limine" ]; then buildLimine; fi
+
+echo "TO TEST:"
+echo "qemu-system-$archClangTarget -cdrom $outputPath.iso"
