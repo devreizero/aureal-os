@@ -38,8 +38,8 @@ struct PageTable {
     struct PageEntry entries[512];
 };
 
-uint64_t cr3Read();
-struct PageTable *pageTableInit();
+uint64_t readCR3();
+struct PageTable *initPageTable();
 PhysAddr getPhysicalAddress(VirtAddr address);
 void mapPage(VirtAddr virtualAddress, PhysAddr physicalAddress, uint8_t flags);
 

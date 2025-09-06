@@ -10,10 +10,10 @@ static inline void flushTLB(VirtAddr page) {
 }
 
 static inline struct PageTable* physToPtr(PhysAddr addr) {
-    return (struct PageTable*) ((uintptr_t) addr << 12);
+    return (struct PageTable*) (addr << 12);
 }
 
-static void setPageTableEntry(struct PageEntry* entry, uint8_t flags, PhysAddr physical_address, uint16_t available) {
+static void setPageTableEntry(struct PageEntry* entry, uint8_t flags, PhysAddr physicalAddress, uint16_t available) {
     entry->present = (flags >> 1) & 1;
     entry->writable = (flags >> 2) & 1;
     entry->userAccessible = (flags >> 3) & 1;
@@ -22,7 +22,7 @@ static void setPageTableEntry(struct PageEntry* entry, uint8_t flags, PhysAddr p
     entry->pat = (flags & 0x20) & 1;
     entry->global = (flags & 0x40) & 1;
     entry->avl1 = available & 0x3;
-    entry->physicalAddress = physical_address; 
+    entry->physicalAddress = physicalAddress; 
     entry->avl2 = available >> 3;
     entry->noExecute = flags >> 7;
 }
